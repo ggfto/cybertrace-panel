@@ -4,6 +4,12 @@ Todas as mudancas relevantes deste projeto sao documentadas aqui.
 O formato segue [Conventional Commits](https://www.conventionalcommits.org/pt-br/)
 e o versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [2.6.3](https://github.com/ggfto/cybertrace-panel/compare/v2.6.2...v2.6.3) (2026-08-12)
+
+### Documentacao
+
+* **deploy:** fixa a versao do cf-tunnel-init no exemplo ([89142a9](https://github.com/ggfto/cybertrace-panel/commit/89142a99fcf0a05917aebd9530d23b393b6f77ca))
+
 ## [2.6.2](https://github.com/ggfto/cybertrace-panel/compare/v2.6.1...v2.6.2) (2026-08-12)
 
 ### Correcoes

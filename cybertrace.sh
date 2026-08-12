@@ -11,7 +11,7 @@
 # ============================================================
 
 # Fonte unica da versao (atualizada automaticamente pelo semantic-release).
-CYBERTRACE_VERSION="2.6.2"
+CYBERTRACE_VERSION="2.6.3"
 
 VERDE='\033[1;32m'
 VERMELHO='\033[1;31m'
