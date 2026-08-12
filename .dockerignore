@@ -4,3 +4,4 @@
 !cybertrace.sh
 !ip_consulta.py
 !cpf_consulta.py
+!docker/web-entrypoint.sh

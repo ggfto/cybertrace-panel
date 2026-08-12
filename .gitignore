@@ -7,3 +7,9 @@ __pycache__/
 node_modules/
 .release-version
 npm-debug.log*
+
+# Segredos de deploy — o .env carrega o token do tunnel.
+# Versionamos apenas o .env.example.
+.env
+*/.env
+!*/.env.example

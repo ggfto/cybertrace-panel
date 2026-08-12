@@ -67,6 +67,7 @@ a major e `latest`.
 |-----|----------|
 | `latest`, `X`, `X.Y`, `X.Y.Z` | imagem enxuta (~250 MB) — opções 1-10 e 12-25 |
 | `latest-full`, `X-full`, `X.Y-full`, `X.Y.Z-full` | \+ Chromium e Selenium (~1,3 GB) — inclui a opção 11 (CPF completo) |
+| `latest-web`, `X-web`, `X.Y-web`, `X.Y.Z-web` | \+ [ttyd](https://github.com/tsl0922/ttyd): serve o painel no navegador |
 
 ```bash
 docker run --rm -it ghcr.io/ggfto/cybertrace-panel:latest-full   # com a opção 11
@@ -75,6 +76,35 @@ docker run --rm -it ghcr.io/ggfto/cybertrace-panel:2             # fixa na major
 
 A opção 24 (atualizar via `git pull`) não se aplica em container: atualize com
 `docker pull`. O painel detecta isso e avisa.
+
+### No navegador (imagem `-web`)
+
+A variante `-web` embute o [ttyd](https://github.com/tsl0922/ttyd), que serve o
+terminal por websocket: o painel aparece no navegador exatamente como é —
+menu, cores e banner — inclusive no celular.
+
+```bash
+docker run --rm -p 7681:7681 \
+  -e TTYD_CREDENTIAL=usuario:senha \
+  ghcr.io/ggfto/cybertrace-panel:latest-web
+# abra http://localhost:7681
+```
+
+> **Nunca exponha essa porta publicamente sem autenticação.** O ttyd roda em
+> modo `--writable` (sem isso o menu não aceitaria teclado), e a opção 22
+> (consulta em lote) lê arquivos arbitrários de dentro do container. Use o
+> `TTYD_CREDENTIAL` e, para acesso externo, algo como o Cloudflare Access.
+
+| Variável | Efeito |
+|----------|--------|
+| `TTYD_PORT` | porta interna (padrão `7681`) |
+| `TTYD_CREDENTIAL` | `usuario:senha` para basic auth; vazio desliga |
+| `TTYD_MAX_CLIENTS` | sessões simultâneas (padrão `5`, `0` = sem limite) |
+| `TTYD_TITLE` | título da aba do navegador |
+
+Para publicar via Cloudflare Tunnel há um stack pronto em
+[`deploy/`](deploy/), inteiramente configurado por `.env` — veja
+[`deploy/README.md`](deploy/README.md).
 
 #### Variáveis de ambiente
 

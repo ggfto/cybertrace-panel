@@ -83,6 +83,48 @@ ENV CHROME_BIN=/usr/bin/chromium \
 USER cybertrace
 
 # ------------------------------------------------------------
+# web: full + ttyd, serve o painel no navegador
+#
+# O ttyd nao existe nos repos do Debian, entao baixamos o binario estatico
+# oficial e conferimos o checksum publicado no SHA256SUMS do release.
+# ------------------------------------------------------------
+FROM full AS web
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG TTYD_VERSION=1.7.7
+ARG TARGETARCH
+USER root
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    case "$TARGETARCH" in \
+        amd64) arq=x86_64; sha=8a217c968aba172e0dbf3f34447218dc015bc4d5e59bf51db2f2cd12b7be4f55 ;; \
+        arm64) arq=aarch64; sha=b38acadd89d1d396a0f5649aa52c539edbad07f4bc7348b27b4f4b7219dd4165 ;; \
+        *) echo "arquitetura sem binario de ttyd: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL -o /usr/local/bin/ttyd \
+        "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.${arq}"; \
+    echo "${sha}  /usr/local/bin/ttyd" | sha256sum -c -; \
+    chmod +x /usr/local/bin/ttyd; \
+    ttyd --version
+
+COPY --chown=root:root docker/web-entrypoint.sh /usr/local/bin/web-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/web-entrypoint.sh \
+    && chmod +x /usr/local/bin/web-entrypoint.sh
+
+ENV TTYD_PORT=7681 \
+    TTYD_MAX_CLIENTS=5
+
+EXPOSE 7681
+USER cybertrace
+
+ENTRYPOINT ["/usr/local/bin/web-entrypoint.sh"]
+CMD []
+
+# ------------------------------------------------------------
 # runtime: alvo padrao (imagem enxuta) — deve ser o ultimo estagio
 # ------------------------------------------------------------
 FROM base AS runtime

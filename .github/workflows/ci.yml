@@ -72,6 +72,9 @@ jobs:
           - target: full
             platform: linux/amd64
             runner: ubuntu-latest
+          - target: web
+            platform: linux/amd64
+            runner: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -101,8 +104,8 @@ jobs:
             echo "OK  usuario nao-root: $(id -un)"
           '
 
-      - name: Smoke test — Chromium/Selenium (apenas :full)
-        if: matrix.target == 'full'
+      - name: Smoke test — Chromium/Selenium (:full e :web)
+        if: matrix.target == 'full' || matrix.target == 'web'
         run: |
           docker run --rm --entrypoint bash cybertrace:ci -c '
             set -e
@@ -113,5 +116,31 @@ jobs:
 
       - name: Smoke test — CLI responde
         run: |
-          docker run --rm cybertrace:ci --help | tee /tmp/help.txt
+          # Em :web o ENTRYPOINT e o ttyd, entao chamamos o script direto.
+          docker run --rm --entrypoint /app/cybertrace.sh cybertrace:ci --help | tee /tmp/help.txt
           grep -q "CYBERTRACE v" /tmp/help.txt
+
+      - name: Smoke test — ttyd serve o painel (apenas :web)
+        if: matrix.target == 'web'
+        run: |
+          docker run -d --name ttyd-ci -p 7681:7681 \
+            -e TTYD_CREDENTIAL=ci:senha-ci cybertrace:ci
+          for i in $(seq 1 30); do
+            curl -fsS -o /dev/null -u ci:senha-ci http://localhost:7681/ && break
+            sleep 1
+          done
+
+          echo "--- basic auth barra sem credencial ---"
+          codigo=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:7681/)
+          [ "$codigo" = "401" ] || { echo "esperava 401, veio $codigo"; exit 1; }
+          echo "OK  401 sem credencial"
+
+          echo "--- pagina responde com credencial ---"
+          codigo=$(curl -s -o /dev/null -w '%{http_code}' -u ci:senha-ci http://localhost:7681/)
+          [ "$codigo" = "200" ] || { echo "esperava 200, veio $codigo"; exit 1; }
+          echo "OK  200 com credencial"
+
+          docker logs ttyd-ci 2>&1 | grep -q "Listening on port" || {
+            echo "ttyd nao subiu"; docker logs ttyd-ci; exit 1; }
+          echo "OK  ttyd escutando"
+          docker rm -f ttyd-ci >/dev/null

@@ -1,0 +1,63 @@
+# ============================================================
+# Cybertrace Panel no navegador, publicado via Cloudflare Tunnel.
+#
+# Padrao: cada stack sobe o proprio cloudflared na rede interna do stack.
+# Nenhuma porta e publicada no host — o tunnel alcanca o servico pelo nome
+# do servico na rede do compose, e o unico caminho de fora e o hostname
+# configurado na Cloudflare.
+#
+# Toda a configuracao vem do .env ao lado deste arquivo (veja .env.example).
+#   cp .env.example .env && $EDITOR .env && docker compose up -d
+# ============================================================
+
+# Nome do projeto vem do .env, nao do nome do diretorio — sem isso a rede e o
+# prefixo dos recursos mudariam conforme onde o arquivo estivesse.
+name: ${STACK_NAME:-cybertrace}
+
+services:
+  painel:
+    image: ${CYBERTRACE_IMAGE:-ghcr.io/ggfto/cybertrace-panel}:${CYBERTRACE_TAG:-latest-web}
+    container_name: ${STACK_NAME:-cybertrace}-painel
+    restart: ${RESTART_POLICY:-unless-stopped}
+    # expose, nao ports: so o cloudflared enxerga, nada abre no host.
+    expose:
+      - "${APP_PORT:-7681}"
+    environment:
+      TTYD_PORT: ${APP_PORT:-7681}
+      TTYD_MAX_CLIENTS: ${TTYD_MAX_CLIENTS:-5}
+      TTYD_TITLE: ${TTYD_TITLE:-Cybertrace Panel}
+      # Defesa em profundidade: mesmo atras do Cloudflare Access.
+      TTYD_CREDENTIAL: ${TTYD_CREDENTIAL:-}
+      LINKETRACK_USER: ${LINKETRACK_USER:-}
+      LINKETRACK_TOKEN: ${LINKETRACK_TOKEN:-}
+    volumes:
+      - historico:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://localhost:${APP_PORT:-7681}/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  tunnel:
+    image: cloudflare/cloudflared:${CLOUDFLARED_TAG:-latest}
+    container_name: ${STACK_NAME:-cybertrace}-tunnel
+    restart: ${RESTART_POLICY:-unless-stopped}
+    command: tunnel --no-autoupdate run
+    environment:
+      # Token via env, nunca como argumento de linha de comando: como arg ele
+      # fica visivel em `docker inspect` e na lista de processos do host.
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?defina TUNNEL_TOKEN no .env}
+      TUNNEL_METRICS: 0.0.0.0:${TUNNEL_METRICS_PORT:-2000}
+    depends_on:
+      painel:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "cloudflared", "--version"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  historico:
+    name: ${STACK_NAME:-cybertrace}-historico
