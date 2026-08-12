@@ -1,0 +1,19 @@
+services:
+  cybertrace:
+    image: ghcr.io/ggfto/cybertrace-panel:latest
+    # Para construir localmente em vez de baixar a imagem publicada:
+    # build:
+    #   context: .
+    #   target: runtime   # ou "full" para incluir Chromium/Selenium
+    container_name: cybertrace
+    stdin_open: true
+    tty: true
+    volumes:
+      - cybertrace-data:/data
+    environment:
+      # Opcional: credenciais do rastreio de encomendas (linketrack.com)
+      LINKETRACK_USER: ${LINKETRACK_USER:-}
+      LINKETRACK_TOKEN: ${LINKETRACK_TOKEN:-}
+
+volumes:
+  cybertrace-data:

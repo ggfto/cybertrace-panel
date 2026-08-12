@@ -1,13 +1,17 @@
 #!/bin/bash
 
 # ============================================================
-# CYBERTRACE v2.4 - Painel de Investigacao Digital
+# CYBERTRACE - Painel de Investigacao Digital
 # Consultas com APIs publicas reais
 # ------------------------------------------------------------
 # TERMUX:  bash install.sh
 # LINUX:   bash install.sh --linux
+# DOCKER:  docker run --rm -it ghcr.io/ggfto/cybertrace-panel
 # AJUDA:   bash cybertrace.sh --help
 # ============================================================
+
+# Fonte unica da versao (atualizada automaticamente pelo semantic-release).
+CYBERTRACE_VERSION="2.4.0"
 
 VERDE='\033[1;32m'
 VERMELHO='\033[1;31m'
@@ -17,12 +21,18 @@ CIANO='\033[1;36m'
 RESET='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HIST_FILE="$SCRIPT_DIR/.cybertrace_historico.log"
+# CYBERTRACE_HIST permite apontar o historico para um volume (usado no Docker).
+HIST_FILE="${CYBERTRACE_HIST:-$SCRIPT_DIR/.cybertrace_historico.log}"
 
 # ============================================================
 # AUXILIARES
 # ============================================================
 is_termux() { command -v termux-open-url &>/dev/null; }
+
+is_container() {
+    [[ -n "$CYBERTRACE_DOCKER" || -f /.dockerenv ]] \
+        || grep -qaE '(docker|containerd|kubepods)' /proc/1/cgroup 2>/dev/null
+}
 
 url_encode() {
     python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$1" 2>/dev/null
@@ -35,6 +45,17 @@ api_get() {
 press_enter() {
     echo ""
     read -r -p "Pressione ENTER para continuar..." _
+}
+
+# Centraliza um texto dentro da moldura do banner (largura interna = 47).
+banner_linha() {
+    local cor="$1" texto="$2" largura=47 esq dir
+    esq=$(( (largura - ${#texto}) / 2 ))
+    dir=$(( largura - ${#texto} - esq ))
+    (( esq < 0 )) && esq=0
+    (( dir < 0 )) && dir=0
+    printf "║%s%*s%s%*s%s║\n" \
+        "$(printf '%b' "$cor")" "$esq" "" "$texto" "$dir" "" "$(printf '%b' "$VERMELHO")"
 }
 
 banner() {
@@ -50,8 +71,8 @@ banner() {
     echo -e "║     ${CIANO}╚═════╝    ╚═╝   ╚═════╝ ╚══════╝╚═╝  ╚═╝${VERMELHO} ║"
     echo "║                                               ║"
     echo "╠═══════════════════════════════════════════════╣"
-    echo -e "║${AMARELO}    PAINEL DE INVESTIGACAO DIGITAL v2.4   ${VERMELHO}║"
-    echo -e "║${CIANO} github.com/ClubeDoTermux/cybertrace-panel ${VERMELHO}║"
+    banner_linha "$AMARELO" "PAINEL DE INVESTIGACAO DIGITAL v$CYBERTRACE_VERSION"
+    banner_linha "$CIANO" "github.com/ClubeDoTermux/cybertrace-panel"
     echo "╚═══════════════════════════════════════════════╝"
     echo -e "${RESET}"
 }
@@ -74,7 +95,7 @@ salvar_historico() {
 # HELP
 # ============================================================
 show_help() {
-    echo -e "${CIANO}CYBERTRACE v2.4 - Painel de Investigacao Digital${RESET}"
+    echo -e "${CIANO}CYBERTRACE v$CYBERTRACE_VERSION - Painel de Investigacao Digital${RESET}"
     echo -e "${AMARELO}Uso:${RESET} bash cybertrace.sh [opcao] [valor]"
     echo ""
     echo -e "${VERDE}Opcoes:${RESET}"
@@ -823,6 +844,12 @@ historico_menu() {
 atualizar_painel() {
     banner
     section "ATUALIZAR (GIT PULL)"
+    if is_container; then
+        echo -e "${AMARELO}[i] Rodando em container — atualize puxando a imagem nova:${RESET}"
+        echo -e "  ${CIANO}docker pull ghcr.io/ggfto/cybertrace-panel:latest${RESET}"
+        press_enter
+        return
+    fi
     cd "$SCRIPT_DIR" || return
     git fetch origin main 2>/dev/null || git fetch origin master 2>/dev/null
     local atual nova
@@ -940,9 +967,28 @@ redes_sociais() {
 # CPF COMPLETO (Selenium - requer Linux/Chrome)
 # ============================================================
 cpf_completo_menu() {
+    if python3 -c "import selenium, bs4" 2>/dev/null; then
+        local cpf
+        read -r -p "Digite o CPF (somente numeros): " cpf
+        cpf=$(echo "$cpf" | tr -cd '0-9')
+        if [[ ${#cpf} -ne 11 ]]; then
+            echo -e "${VERMELHO}[!] CPF deve ter 11 digitos.${RESET}"
+        else
+            python3 "$SCRIPT_DIR/cpf_consulta.py" "$cpf"
+            salvar_historico "CPF COMPLETO: $cpf"
+        fi
+        press_enter
+        return
+    fi
+
     echo -e "${VERMELHO}[!] Requer Chrome + Selenium — indisponivel no Termux.${RESET}"
-    echo -e "${AMARELO}Linux: pip install selenium webdriver-manager beautifulsoup4${RESET}"
-    echo -e "${AMARELO}Depois: python3 cpf_consulta.py SEU_CPF${RESET}"
+    if is_container; then
+        echo -e "${AMARELO}Use a imagem completa:${RESET}"
+        echo -e "  ${CIANO}docker run --rm -it ghcr.io/ggfto/cybertrace-panel:latest-full${RESET}"
+    else
+        echo -e "${AMARELO}Linux: pip install selenium webdriver-manager beautifulsoup4${RESET}"
+        echo -e "${AMARELO}Depois: python3 cpf_consulta.py SEU_CPF${RESET}"
+    fi
     press_enter
 }
 
@@ -1272,7 +1318,7 @@ cli_geocode() {
     local lat="$1" lon="$2"
     local url="https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lon&accept-language=pt-BR&zoom=18"
     local data
-    data=$(curl -s --max-time 12 -A "cybertrace-panel/2.4 (ClubeDoTermux)" "$url" 2>/dev/null)
+    data=$(curl -s --max-time 12 -A "cybertrace-panel/$CYBERTRACE_VERSION (ClubeDoTermux)" "$url" 2>/dev/null)
     if echo "$data" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d.get('display_name') else 1)" 2>/dev/null; then
         echo "$data" | python3 -c "
 import sys, json

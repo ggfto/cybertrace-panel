@@ -1,0 +1,6 @@
+# Tudo por padrao — o Dockerfile copia explicitamente o que precisa.
+*
+
+!cybertrace.sh
+!ip_consulta.py
+!cpf_consulta.py

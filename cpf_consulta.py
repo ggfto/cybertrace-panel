@@ -4,6 +4,8 @@ Requer: pip install selenium webdriver-manager beautifulsoup4
 Requer: Google Chrome ou Chromium instalado
 """
 
+import os
+import shutil
 import sys
 import time
 import re
@@ -15,12 +17,29 @@ try:
     from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.chrome.options import Options
     from selenium.common.exceptions import TimeoutException, WebDriverException
-    from webdriver_manager.chrome import ChromeDriverManager
     from bs4 import BeautifulSoup
 except ImportError as e:
     print("\nERRO: Dependência faltando:", e)
     print("  pip install selenium webdriver-manager beautifulsoup4\n")
     sys.exit(1)
+
+try:
+    from webdriver_manager.chrome import ChromeDriverManager
+except ImportError:
+    ChromeDriverManager = None
+
+
+def localizar_chromedriver() -> str:
+    """Usa um chromedriver já instalado (imagem Docker :full) e só recorre ao
+    download do webdriver-manager quando não houver nenhum no sistema."""
+    caminho = os.environ.get("CHROMEDRIVER_PATH") or shutil.which("chromedriver")
+    if caminho:
+        return caminho
+    if ChromeDriverManager is None:
+        raise RuntimeError(
+            "chromedriver não encontrado e webdriver-manager não instalado"
+        )
+    return ChromeDriverManager().install()
 
 
 def formatar_cpf(cpf: str) -> str:
@@ -56,7 +75,10 @@ def consultar_cpf(cpf: str) -> dict:
 
     try:
         print("  Iniciando Chrome...")
-        service = Service(ChromeDriverManager().install())
+        service = Service(localizar_chromedriver())
+        binario = os.environ.get("CHROME_BIN") or shutil.which("chromium")
+        if binario:
+            options.binary_location = binario
         driver = webdriver.Chrome(service=service, options=options)
         driver.execute_script(
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"

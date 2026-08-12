@@ -1,10 +1,14 @@
 #!/bin/bash
 
 # ============================================================
-# install.sh - Instalador do Cybertrace Panel v2.4
+# install.sh - Instalador do Cybertrace Panel
 #   Termux:  bash install.sh
 #   Linux:   bash install.sh --linux
+#   Docker:  docker run --rm -it ghcr.io/ggfto/cybertrace-panel
 # ============================================================
+
+# Fonte unica da versao (atualizada automaticamente pelo semantic-release).
+CYBERTRACE_VERSION="2.4.0"
 
 VERDE='\033[1;32m'
 VERMELHO='\033[1;31m'
@@ -13,7 +17,7 @@ CIANO='\033[1;36m'
 RESET='\033[0m'
 
 echo -e "${CIANO}=============================================${RESET}"
-echo -e "${CIANO}  CYBERTRACE PANEL v2.4 - INSTALADOR${RESET}"
+echo -e "${CIANO}  CYBERTRACE PANEL v$CYBERTRACE_VERSION - INSTALADOR${RESET}"
 echo -e "${CIANO}=============================================${RESET}"
 echo ""
 

@@ -1,0 +1,6 @@
+# Projeto consumido em Linux/Termux/Docker: tudo em LF, inclusive em checkouts
+# Windows. Com CRLF o shebang vira "#!/bin/bash\r" e o container falha com
+# "exec: no such file or directory".
+* text=auto eol=lf
+
+*.png binary
