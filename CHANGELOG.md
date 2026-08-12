@@ -4,6 +4,12 @@ Todas as mudancas relevantes deste projeto sao documentadas aqui.
 O formato segue [Conventional Commits](https://www.conventionalcommits.org/pt-br/)
 e o versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [2.5.2](https://github.com/ggfto/cybertrace-panel/compare/v2.5.1...v2.5.2) (2026-08-12)
+
+### Correcoes
+
+* grava historico tambem no modo CLI ([15da0ca](https://github.com/ggfto/cybertrace-panel/commit/15da0caa203a71764bd40106b5ec6589cba425b2))
+
 ## [2.5.1](https://github.com/ggfto/cybertrace-panel/compare/v2.5.0...v2.5.1) (2026-08-12)
 
 ### Documentacao
