@@ -1,10 +1,10 @@
 # ============================================================
 # Cybertrace Panel no navegador, publicado via Cloudflare Tunnel.
 #
-# Padrao: cada stack sobe o proprio cloudflared na rede interna do stack.
-# Nenhuma porta e publicada no host — o tunnel alcanca o servico pelo nome
-# do servico na rede do compose, e o unico caminho de fora e o hostname
-# configurado na Cloudflare.
+# Padrao: o cf-tunnel-init provisiona o tunnel pela API (idempotente), renderiza
+# o ingress e faz upsert do DNS; o cloudflared sobe depois e le o config.yml do
+# volume compartilhado. Nao ha tunnel criado no painel, nem token em linha de
+# comando, nem porta publicada no host.
 #
 # Toda a configuracao vem do .env ao lado deste arquivo (veja .env.example).
 #   cp .env.example .env && $EDITOR .env && docker compose up -d
@@ -39,25 +39,38 @@ services:
       retries: 3
       start_period: 10s
 
+  # Roda ate o fim e sai 0; o cloudflared so comeca depois disso.
+  tunnel-init:
+    image: ghcr.io/ggfto/cf-tunnel-init:${CF_TUNNEL_INIT_TAG:-latest}
+    container_name: ${STACK_NAME:-cybertrace}-tunnel-init
+    restart: "no"
+    environment:
+      # Escopos: Account > Cloudflare Tunnel: Edit, e Zone > DNS: Edit nesta zona.
+      CF_API_TOKEN: ${CF_API_TOKEN:?defina CF_API_TOKEN no .env}
+      CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:?defina CF_ACCOUNT_ID no .env}
+      CF_ZONE_ID: ${CF_ZONE_ID:?defina CF_ZONE_ID no .env}
+      TUNNEL_NAME: ${TUNNEL_NAME:-cybertrace}
+      CF_HOSTNAME: ${APP_HOSTNAME:?defina APP_HOSTNAME no .env}
+      CF_SERVICE: http://${STACK_NAME:-cybertrace}-painel:${APP_PORT:-7681}
+    volumes:
+      - cf-runtime:/etc/cloudflared
+
   tunnel:
     image: cloudflare/cloudflared:${CLOUDFLARED_TAG:-latest}
     container_name: ${STACK_NAME:-cybertrace}-tunnel
     restart: ${RESTART_POLICY:-unless-stopped}
-    command: tunnel --no-autoupdate run
-    environment:
-      # Token via env, nunca como argumento de linha de comando: como arg ele
-      # fica visivel em `docker inspect` e na lista de processos do host.
-      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?defina TUNNEL_TOKEN no .env}
-      TUNNEL_METRICS: 0.0.0.0:${TUNNEL_METRICS_PORT:-2000}
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      # Somente leitura: so o init escreve aqui.
+      - cf-runtime:/etc/cloudflared:ro
     depends_on:
+      tunnel-init:
+        condition: service_completed_successfully
       painel:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "cloudflared", "--version"]
-      interval: 60s
-      timeout: 5s
-      retries: 3
 
 volumes:
   historico:
     name: ${STACK_NAME:-cybertrace}-historico
+  cf-runtime:
+    name: ${STACK_NAME:-cybertrace}-cf-runtime

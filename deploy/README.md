@@ -1,68 +1,72 @@
 # Deploy: painel no navegador via Cloudflare Tunnel
 
-Stack de dois containers, sem nenhuma porta publicada no host:
+Três containers, sem nenhuma porta publicada no host:
 
 ```
 navegador ──HTTPS──> Cloudflare ──tunnel──> cloudflared ──rede interna──> ttyd
-                     (Access)                                             cybertrace.sh
+                     (Access)                    ▲                        cybertrace.sh
+                                                 │ config.yml + creds.json
+                                            tunnel-init (roda uma vez, sai 0)
+                                                 │
+                                            API da Cloudflare
 ```
 
-Toda a configuração vem do `.env`. O compose não tem valor fixo de host,
-porta, imagem ou nome de stack.
+Toda a configuração vem do `.env`. O compose não tem valor fixo de host, porta,
+imagem ou nome de stack — e **não há nada a criar no painel da Cloudflare**.
 
 ## Uso
 
 ```bash
 cp .env.example .env
-$EDITOR .env          # preencha ao menos TUNNEL_TOKEN
+$EDITOR .env
 docker compose up -d
 ```
 
-O compose falha imediatamente se `TUNNEL_TOKEN` estiver vazio, em vez de subir
-um tunnel quebrado.
+O compose falha imediatamente se faltar qualquer variável obrigatória, em vez de
+subir um stack meio configurado.
+
+Na primeira subida, o [`cf-tunnel-init`](https://github.com/ggfto/cf-tunnel-init)
+cria o tunnel pela API, renderiza o ingress, escreve `config.yml` e `creds.json`
+no volume e faz upsert do CNAME proxied. É idempotente: roda a cada `up` e
+reconcilia o que estiver fora do lugar.
 
 ## O que o `.env` controla
 
 | Variável | Efeito |
 |----------|--------|
-| `STACK_NAME` | prefixo dos containers, nome do projeto, da rede e do volume |
+| `STACK_NAME` | prefixo dos containers, nome do projeto, da rede e dos volumes |
 | `CYBERTRACE_IMAGE` / `CYBERTRACE_TAG` | imagem e versão (fixe em `X.Y.Z-web` para deploy reproduzível) |
 | `APP_PORT` | porta interna do ttyd — não é publicada no host |
 | `TTYD_CREDENTIAL` | basic auth `usuario:senha` |
 | `TTYD_MAX_CLIENTS`, `TTYD_TITLE` | limites e aparência |
-| `TUNNEL_TOKEN` | token do tunnel (**obrigatório**) |
-| `APP_HOSTNAME` | hostname público — documentação, veja a ressalva abaixo |
-| `CLOUDFLARED_TAG`, `TUNNEL_METRICS_PORT`, `RESTART_POLICY` | infraestrutura |
+| `CF_API_TOKEN`, `CF_ACCOUNT_ID`, `CF_ZONE_ID` | credenciais da API (**obrigatórias**) |
+| `APP_HOSTNAME` | hostname público — o CNAME é criado automaticamente |
+| `TUNNEL_NAME` | um tunnel por stack; único na conta |
+| `CF_TUNNEL_INIT_TAG`, `CLOUDFLARED_TAG`, `RESTART_POLICY` | infraestrutura |
 | `LINKETRACK_USER` / `LINKETRACK_TOKEN` | rastreio de encomendas |
 
-Como `STACK_NAME` controla tudo, dá para rodar várias instâncias no mesmo host
-sem colisão:
+O `CF_SERVICE` do init é montado a partir de `STACK_NAME` e `APP_PORT`, então não
+precisa ser configurado.
+
+Como `STACK_NAME` controla tudo, dá para rodar várias instâncias no mesmo host:
 
 ```bash
-STACK_NAME=ct-lab docker compose up -d
+STACK_NAME=ct-lab TUNNEL_NAME=ct-lab APP_HOSTNAME=ct-lab.gf2.in docker compose up -d
 ```
 
-## O ingress mora na Cloudflare, não aqui
+## O token da API
 
-Com tunnel por **token** (*remotely-managed*), o mapeamento hostname → serviço
-fica no painel da Cloudflare, não no compose. O `APP_HOSTNAME` no `.env` é
-documentação de para onde este stack responde; ele não configura nada sozinho.
+Precisa de dois escopos, em **My Profile → API Tokens → Create Token → Custom**:
 
-Configure uma vez em **Zero Trust → Networks → Tunnels → seu tunnel → Public
-hostname**:
+| Permissão | Nível |
+|-----------|-------|
+| Cloudflare Tunnel : Edit | Account |
+| DNS : Edit | Zone (a zona do `APP_HOSTNAME`) |
 
-| Campo | Valor |
-|-------|-------|
-| Subdomain / Domain | o que estiver em `APP_HOSTNAME` |
-| Service type | `HTTP` |
-| URL | `<STACK_NAME>-painel:<APP_PORT>` (ex.: `cybertrace-painel:7681`) |
-
-O tunnel alcança o serviço pelo nome do container na rede do compose — por isso
-nenhuma porta precisa ficar aberta no host.
-
-Se quiser o ingress versionado junto do código, é preciso migrar para um tunnel
-*locally-managed* (`config.yml` + credentials JSON). Aí o roteamento sai do
-painel e entra no repositório, ao custo de gerenciar o arquivo de credenciais.
+É um segredo mais poderoso que um token de tunnel — ele pode criar e apagar
+tunnels na conta e editar DNS da zona. Em compensação, é o **único** segredo
+durável: o volume `cf-runtime` pode ser destruído e é reconstruído da API no
+próximo boot.
 
 ## Segurança
 
@@ -77,8 +81,7 @@ Duas camadas, e vale usar as duas:
 2. **`TTYD_CREDENTIAL`** como defesa em profundidade, caso o Access seja
    removido ou mal configurado.
 
-O token do tunnel é passado por **variável de ambiente**, nunca como argumento
-de linha de comando — como argumento ele apareceria inteiro em
-`docker inspect` e na lista de processos do host.
+Nenhum token vai por linha de comando em lugar nenhum — como argumento ele
+apareceria em `docker inspect` e na lista de processos do host.
 
 O `.env` é ignorado pelo git; apenas o `.env.example` é versionado.
