@@ -1,0 +1,210 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # ------------------------------------------------------------
+  # 1. semantic-release: analisa os commits, decide a versao,
+  #    atualiza CHANGELOG/README/scripts, cria a tag e a release.
+  # ------------------------------------------------------------
+  release:
+    name: semantic-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      versao: ${{ steps.semantic.outputs.versao }}
+      publicou: ${{ steps.semantic.outputs.publicou }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Rodar semantic-release
+        id: semantic
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          npx semantic-release
+          # .release-version so existe se uma versao nova foi publicada
+          # (escrito pelo successCmd do @semantic-release/exec).
+          if [ -f .release-version ]; then
+            VERSAO="$(cat .release-version)"
+            echo "versao=$VERSAO"    >> "$GITHUB_OUTPUT"
+            echo "publicou=true"     >> "$GITHUB_OUTPUT"
+            echo "::notice::Publicada a versao $VERSAO"
+          else
+            echo "publicou=false"    >> "$GITHUB_OUTPUT"
+            echo "::notice::Nenhum commit exigiu release nova."
+          fi
+
+  # ------------------------------------------------------------
+  # 2. Build multi-arch (amd64 + arm64) e push para o GHCR.
+  #    Cada arquitetura constroi no seu proprio runner nativo
+  #    (sem emulacao QEMU) e o manifesto e unido no final.
+  # ------------------------------------------------------------
+  build:
+    name: Build ${{ matrix.variante }} (${{ matrix.arch }})
+    needs: release
+    if: needs.release.outputs.publicou == 'true'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        variante: [slim, full]
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+          - variante: slim
+            target: runtime
+          - variante: full
+            target: full
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Constroi exatamente o commit taggeado pelo semantic-release.
+          ref: v${{ needs.release.outputs.versao }}
+
+      - name: SHA do commit taggeado
+        id: rev
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push por digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          platforms: linux/${{ matrix.arch }}
+          labels: |
+            org.opencontainers.image.title=Cybertrace Panel
+            org.opencontainers.image.description=Painel de Investigacao Digital com consultas a APIs publicas reais
+            org.opencontainers.image.version=${{ needs.release.outputs.versao }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.rev.outputs.sha }}
+            org.opencontainers.image.licenses=MIT
+          cache-from: type=gha,scope=${{ matrix.variante }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variante }}-${{ matrix.arch }}
+          outputs: type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Guardar o digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.variante }}-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # ------------------------------------------------------------
+  # 3. Une os digests amd64+arm64 num unico manifesto multi-arch
+  #    e aplica as tags finais.
+  # ------------------------------------------------------------
+  manifest:
+    name: Manifesto ${{ matrix.variante }}
+    needs: [release, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variante: slim
+            sufixo: ''
+          - variante: full
+            sufixo: '-full'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-${{ matrix.variante }}-*
+          merge-multiple: true
+          path: /tmp/digests
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Criar e publicar o manifesto multi-arch
+        working-directory: /tmp/digests
+        env:
+          IMAGEM: ghcr.io/${{ github.repository }}
+          VERSAO: ${{ needs.release.outputs.versao }}
+          SUFIXO: ${{ matrix.sufixo }}
+        run: |
+          set -euo pipefail
+          IMAGEM=$(echo "$IMAGEM" | tr '[:upper:]' '[:lower:]')   # GHCR exige minusculas
+          MAJOR="${VERSAO%%.*}"
+          RESTO="${VERSAO#*.}"
+          MINOR="${MAJOR}.${RESTO%%.*}"
+
+          TAGS=()
+          for t in "$VERSAO" "$MINOR" "$MAJOR" latest; do
+            TAGS+=(-t "${IMAGEM}:${t}${SUFIXO}")
+          done
+
+          FONTES=()
+          for d in *; do
+            FONTES+=("${IMAGEM}@sha256:${d}")
+          done
+
+          echo "Tags:   ${TAGS[*]}"
+          echo "Fontes: ${FONTES[*]}"
+          docker buildx imagetools create "${TAGS[@]}" "${FONTES[@]}"
+
+          echo "IMAGEM_LOWER=$IMAGEM" >> "$GITHUB_ENV"
+
+      - name: Conferir o resultado
+        run: |
+          docker buildx imagetools inspect \
+            "${IMAGEM_LOWER}:${{ needs.release.outputs.versao }}${{ matrix.sufixo }}"

@@ -2,3 +2,8 @@ __pycache__/
 *.pyc
 .cybertrace_historico.log
 *.bak
+
+# Node / semantic-release
+node_modules/
+.release-version
+npm-debug.log*

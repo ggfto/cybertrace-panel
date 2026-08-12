@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commitlint:
+    name: Conventional Commits
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Validar mensagens de commit do PR
+        run: >
+          npx commitlint
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+          --verbose
+
+  shell:
+    name: Shell lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        uses: ludeeus/action-shellcheck@master
+        env:
+          SHELLCHECK_OPTS: -e SC2034 -e SC2059 -e SC1091
+        with:
+          severity: error
+
+      - name: bash -n em todos os scripts
+        run: |
+          for f in cybertrace.sh install.sh scripts/*.sh; do
+            bash -n "$f" && echo "OK  $f"
+          done
+
+  docker:
+    name: Build (${{ matrix.target }} / ${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: runtime
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - target: runtime
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+          - target: full
+            platform: linux/amd64
+            runner: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build da imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          platforms: ${{ matrix.platform }}
+          push: false
+          load: true
+          tags: cybertrace:ci
+          cache-from: type=gha,scope=${{ matrix.target }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target }}-${{ matrix.platform }}
+
+      - name: Smoke test — dependencias presentes
+        run: |
+          docker run --rm --entrypoint bash cybertrace:ci -c '
+            set -e
+            for cmd in curl dig openssl qrencode whois python3 ping; do
+              command -v "$cmd" >/dev/null || { echo "FALTANDO: $cmd"; exit 1; }
+              echo "OK  $cmd"
+            done
+            [ "$(id -u)" -ne 0 ] || { echo "container rodando como root"; exit 1; }
+            echo "OK  usuario nao-root: $(id -un)"
+          '
+
+      - name: Smoke test — Chromium/Selenium (apenas :full)
+        if: matrix.target == 'full'
+        run: |
+          docker run --rm --entrypoint bash cybertrace:ci -c '
+            set -e
+            python3 -c "import selenium, bs4; print(\"OK  selenium\", selenium.__version__)"
+            "$CHROME_BIN" --version
+            "$CHROMEDRIVER_PATH" --version
+          '
+
+      - name: Smoke test — CLI responde
+        run: |
+          docker run --rm cybertrace:ci --help | tee /tmp/help.txt
+          grep -q "CYBERTRACE v" /tmp/help.txt

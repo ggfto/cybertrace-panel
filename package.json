@@ -1,0 +1,25 @@
+{
+  "name": "cybertrace-panel",
+  "version": "2.4.0",
+  "private": true,
+  "description": "Painel de Investigacao Digital com consultas a APIs publicas reais",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ggfto/cybertrace-panel.git"
+  },
+  "license": "MIT",
+  "scripts": {
+    "commitlint": "commitlint --from origin/main --to HEAD --verbose",
+    "release": "semantic-release",
+    "release:dry": "semantic-release --dry-run --no-ci"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/exec": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "conventional-changelog-conventionalcommits": "^8.0.0",
+    "semantic-release": "^24.2.1"
+  }
+}

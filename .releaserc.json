@@ -1,0 +1,77 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        "preset": "conventionalcommits",
+        "releaseRules": [
+          { "type": "docs", "release": "patch" },
+          { "type": "refactor", "release": "patch" },
+          { "type": "perf", "release": "patch" },
+          { "type": "build", "release": "patch" },
+          { "type": "ci", "release": false },
+          { "type": "chore", "release": false },
+          { "type": "test", "release": false },
+          { "type": "style", "release": false }
+        ]
+      }
+    ],
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "preset": "conventionalcommits",
+        "presetConfig": {
+          "types": [
+            { "type": "feat", "section": "Novidades" },
+            { "type": "fix", "section": "Correcoes" },
+            { "type": "perf", "section": "Performance" },
+            { "type": "refactor", "section": "Refatoracao" },
+            { "type": "docs", "section": "Documentacao" },
+            { "type": "build", "section": "Build e Docker" },
+            { "type": "revert", "section": "Revertidos" },
+            { "type": "chore", "hidden": true },
+            { "type": "ci", "hidden": true },
+            { "type": "test", "hidden": true },
+            { "type": "style", "hidden": true }
+          ]
+        }
+      }
+    ],
+    [
+      "@semantic-release/changelog",
+      {
+        "changelogFile": "CHANGELOG.md",
+        "changelogTitle": "# Changelog\n\nTodas as mudancas relevantes deste projeto sao documentadas aqui.\nO formato segue [Conventional Commits](https://www.conventionalcommits.org/pt-br/)\ne o versionamento segue [SemVer](https://semver.org/lang/pt-BR/)."
+      }
+    ],
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "bash scripts/bump-version.sh ${nextRelease.version}",
+        "successCmd": "echo ${nextRelease.version} > .release-version"
+      }
+    ],
+    [
+      "@semantic-release/npm",
+      {
+        "npmPublish": false
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": [
+          "CHANGELOG.md",
+          "package.json",
+          "package-lock.json",
+          "README.md",
+          "cybertrace.sh",
+          "install.sh"
+        ],
+        "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ],
+    "@semantic-release/github"
+  ]
+}
