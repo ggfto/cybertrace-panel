@@ -4,6 +4,12 @@ Todas as mudancas relevantes deste projeto sao documentadas aqui.
 O formato segue [Conventional Commits](https://www.conventionalcommits.org/pt-br/)
 e o versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [2.6.2](https://github.com/ggfto/cybertrace-panel/compare/v2.6.1...v2.6.2) (2026-08-12)
+
+### Correcoes
+
+* **deploy:** aceita 401 no healthcheck do painel ([f04078e](https://github.com/ggfto/cybertrace-panel/commit/f04078e769e08eecc3a3a339af1b684e2ce12732))
+
 ## [2.6.1](https://github.com/ggfto/cybertrace-panel/compare/v2.6.0...v2.6.1) (2026-08-12)
 
 ### Build e Docker

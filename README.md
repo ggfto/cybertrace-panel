@@ -1,4 +1,4 @@
-# Cybertrace Panel v2.6.1
+# Cybertrace Panel v2.6.2
 
 Painel de Investigação Digital com consultas a APIs públicas reais.
 
