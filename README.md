@@ -37,6 +37,55 @@ Painel de Investigação Digital com consultas a APIs públicas reais.
 
 ## Instalação
 
+### Docker (não precisa instalar dependência nenhuma)
+
+Imagens multi-arch (`linux/amd64` e `linux/arm64`) publicadas no GHCR a cada release:
+
+```bash
+# menu interativo
+docker run --rm -it ghcr.io/ggfto/cybertrace-panel
+
+# modo CLI
+docker run --rm ghcr.io/ggfto/cybertrace-panel --ip 8.8.8.8
+
+# com histórico persistente
+docker run --rm -it -v cybertrace-data:/data ghcr.io/ggfto/cybertrace-panel
+```
+
+Ou via compose:
+
+```bash
+docker compose run --rm cybertrace
+```
+
+#### Tags disponíveis
+
+| Tag | Conteúdo |
+|-----|----------|
+| `latest`, `2`, `2.4`, `2.4.0` | imagem enxuta (~250 MB) — opções 1-10 e 12-25 |
+| `latest-full`, `2-full`, `2.4-full`, … | \+ Chromium e Selenium (~1,3 GB) — inclui a opção 11 (CPF completo) |
+
+A opção 24 (atualizar via `git pull`) não se aplica em container: atualize com
+`docker pull`. O painel detecta isso e avisa.
+
+```bash
+docker run --rm -it ghcr.io/ggfto/cybertrace-panel:latest-full
+```
+
+#### Variáveis de ambiente
+
+| Variável | Efeito |
+|----------|--------|
+| `LINKETRACK_USER` / `LINKETRACK_TOKEN` | credenciais do rastreio de encomendas |
+| `CYBERTRACE_HIST` | caminho do log de histórico (padrão `/data/.cybertrace_historico.log`) |
+
+#### Construindo localmente
+
+```bash
+docker build --target runtime -t cybertrace .        # enxuta
+docker build --target full    -t cybertrace:full .   # com Chromium
+```
+
 ### Termux (recomendado)
 
 ```bash
@@ -101,11 +150,17 @@ bash cybertrace.sh --rastreio 000123456789BR
 
 ## CPF Completo (opção 11)
 
-Requer Chrome desktop + dependências (não funciona no Termux):
+Requer Chrome/Chromium + dependências (não funciona no Termux):
 
 ```bash
 pip install selenium webdriver-manager beautifulsoup4
 python3 cpf_consulta.py SEU_CPF
+```
+
+Já vem pronto na imagem `-full`, sem instalar nada:
+
+```bash
+docker run --rm -it ghcr.io/ggfto/cybertrace-panel:latest-full
 ```
 
 ## APIs utilizadas
@@ -142,6 +197,13 @@ python3 cpf_consulta.py SEU_CPF
 - 💡 **Reverse geocode**: coordenadas → endereço completo (ferramentas extras [10])
 - 📱 **Instalador dedicado** `install.sh` (Termux e Linux)
 - 🌐 **Timeouts** em todos os comandos DNS/WHOIS — nada trava a consulta
+
+## Contribuindo
+
+Este projeto usa [Conventional Commits](https://www.conventionalcommits.org/pt-br/)
+e release automática via [semantic-release](https://semantic-release.gitbook.io/).
+Um commit `feat:` em `main` gera uma versão minor, publica a GitHub Release e
+constrói as imagens amd64/arm64 sozinho. Detalhes em [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Aviso
 
