@@ -1238,26 +1238,27 @@ buscar_veiculo_cli() {
 case "$1" in
     --help|-h)     show_help ;;
     --ip)          salvar_historico "IP: $2"; python3 "$SCRIPT_DIR/ip_consulta.py" "$2" ;;
-    --cnpj)        cli_cnpj "$2" ;;
-    --cep)         cli_cep "$2" ;;
-    --cpf)         cli_cpf "$2" ;;
-    --fipe|--veiculo) buscar_veiculo_cli "$2" ;;
-    --dominio)     cli_dominio "$2" ;;
-    --email)       cli_email "$2" ;;
-    --telefone)    tel=$(echo "$2" | tr -d ' +-'); echo "Telefone: +$tel"; echo "DDD: ${tel:2:2}"; consultar_ddd "${tel:2:2}" ;;
-    --redes)       for site in "https://www.instagram.com/$2" "https://twitter.com/$2" "https://github.com/$2" "https://www.tiktok.com/@$2" "https://t.me/$2"; do
+    --cnpj)        salvar_historico "CNPJ: $2"; cli_cnpj "$2" ;;
+    --cep)         salvar_historico "CEP: $2"; cli_cep "$2" ;;
+    --cpf)         salvar_historico "CPF: $2"; cli_cpf "$2" ;;
+    --fipe|--veiculo) salvar_historico "FIPE: $2"; buscar_veiculo_cli "$2" ;;
+    --dominio)     salvar_historico "dominio: $2"; cli_dominio "$2" ;;
+    --email)       salvar_historico "email: $2"; cli_email "$2" ;;
+    --telefone)    tel=$(echo "$2" | tr -d ' +-'); salvar_historico "telefone: +$tel"; echo "Telefone: +$tel"; echo "DDD: ${tel:2:2}"; consultar_ddd "${tel:2:2}" ;;
+    --redes)       salvar_historico "redes: $2"
+                   for site in "https://www.instagram.com/$2" "https://twitter.com/$2" "https://github.com/$2" "https://www.tiktok.com/@$2" "https://t.me/$2"; do
                        code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$site" 2>/dev/null)
                        [[ "$code" != "000" && "$code" != "404" ]] && echo "[HTTP $code] $site"
                    done ;;
-    --tempo)       curl -s --max-time 15 "wttr.in/$2?m&lang=pt" 2>/dev/null | head -15 ;;
-    --banco)       cli_banco "$2" ;;
-    --ddd)         consultar_ddd "$2" ;;
-    --cotacoes)    cli_cotacoes ;;
-    --rastreio)    cli_rastreio "$2" ;;
-    --feriados)    cli_feriados "${2:-$(date +%Y)}" ;;
-    --ssl)         cli_ssl "$2" ;;
-    --rdap)        cli_rdap "$2" ;;
-    --portas)      cli_portas "$2" ;;
+    --tempo)       salvar_historico "tempo: $2"; curl -s --max-time 15 "wttr.in/$2?m&lang=pt" 2>/dev/null | head -15 ;;
+    --banco)       salvar_historico "banco: $2"; cli_banco "$2" ;;
+    --ddd)         salvar_historico "DDD: $2"; consultar_ddd "$2" ;;
+    --cotacoes)    salvar_historico "cotacoes"; cli_cotacoes ;;
+    --rastreio)    salvar_historico "rastreio: $2"; cli_rastreio "$2" ;;
+    --feriados)    ano="${2:-$(date +%Y)}"; salvar_historico "feriados $ano"; cli_feriados "$ano" ;;
+    --ssl)         salvar_historico "ssl: $2"; cli_ssl "$2" ;;
+    --rdap)        salvar_historico "rdap: $2"; cli_rdap "$2" ;;
+    --portas)      salvar_historico "portas: $2"; cli_portas "$2" ;;
     --target)      cli_target "$2" ;;
     --historico)   tail -30 "$HIST_FILE" 2>/dev/null || echo "Historico vazio" ;;
     --update)      atualizar_painel ;;
