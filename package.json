@@ -1,6 +1,6 @@
 {
   "name": "cybertrace-panel",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "private": true,
   "description": "Painel de Investigacao Digital com consultas a APIs publicas reais",
   "repository": {
