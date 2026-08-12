@@ -60,17 +60,21 @@ docker compose run --rm cybertrace
 
 #### Tags disponíveis
 
+Cada release publica as duas variantes em quatro tags: a versão exata, a minor,
+a major e `latest`.
+
 | Tag | Conteúdo |
 |-----|----------|
-| `latest`, `2`, `2.4`, `2.4.0` | imagem enxuta (~250 MB) — opções 1-10 e 12-25 |
-| `latest-full`, `2-full`, `2.4-full`, … | \+ Chromium e Selenium (~1,3 GB) — inclui a opção 11 (CPF completo) |
+| `latest`, `X`, `X.Y`, `X.Y.Z` | imagem enxuta (~250 MB) — opções 1-10 e 12-25 |
+| `latest-full`, `X-full`, `X.Y-full`, `X.Y.Z-full` | \+ Chromium e Selenium (~1,3 GB) — inclui a opção 11 (CPF completo) |
+
+```bash
+docker run --rm -it ghcr.io/ggfto/cybertrace-panel:latest-full   # com a opção 11
+docker run --rm -it ghcr.io/ggfto/cybertrace-panel:2             # fixa na major 2
+```
 
 A opção 24 (atualizar via `git pull`) não se aplica em container: atualize com
 `docker pull`. O painel detecta isso e avisa.
-
-```bash
-docker run --rm -it ghcr.io/ggfto/cybertrace-panel:latest-full
-```
 
 #### Variáveis de ambiente
 
