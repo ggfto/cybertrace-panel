@@ -33,7 +33,10 @@ services:
     volumes:
       - historico:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://localhost:${APP_PORT:-7681}/ || exit 1"]
+      # 401 conta como saudavel: com TTYD_CREDENTIAL definido o ttyd exige basic
+      # auth, e `curl -f` trataria a resposta como falha. O que o healthcheck
+      # precisa saber e se o ttyd esta servindo, nao se este curl tem senha.
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:${APP_PORT:-7681}/ | grep -qE '^(200|401)$$'"]
       interval: 30s
       timeout: 5s
       retries: 3
